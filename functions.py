@@ -33,22 +33,23 @@ def read_file(sponsor_data, data_file):
 
     if data_file is not None:
         if sponsor_data[0] == 'Roche Remley':
+            dtype_dic = {'TONUMSEG': str,
+                         'GL_PREIS': str,
+                         'TONUMSCP': str,
+                         'IND_TOSC': str,
+                         'CHROINTS': str,
+                         }
+
             df = pd.read_csv(data_file,
                              converters={'RQPATNUM:': str,
                                          'RQCOVID:': str,
                                          'RQREQNO': str,
-                                         'TONUMSEG': str,
-                                         'GL_PREIS': str,
-                                         'TONUMSCP': str,
-                                         'IND_TOSC': str,
-                                         'CHROINTS': str,
-                                         'requisition_complete': str,
-                                         'lupus_nephritis_complete': str,
 
                                          },
-
+                             dtype=dtype_dic,
+                             na_filter=False, keep_default_na=True,
                              parse_dates=["RQLBDAT", 'DTREC', ])
-            df = df.fillna('')
+
             return df
         elif sponsor_data[0] == 'Roche Majesty':
             df = pd.read_csv(data_file,
@@ -67,37 +68,23 @@ def read_file(sponsor_data, data_file):
 
 def format_df(sponsor_data, study_df):
     if sponsor_data[0] == 'Roche Remley':
-        study_df = (study_df
-        .rename(
-            columns={'RQPATNUM': 'PATNUM',
-                     "Event Name": "VISIT",
-                     "RQREQNO": "ACCSNM",
-                     'RQLBSPEC': 'MISPEC',
-                     'RQLBDAT': "MCFD",
-                     'RENAL': "LBLOC",
-                     'EVFREAS01': 'LBLOC_RND',
-                     'EVFRESC2': "LBLOC_OTHER",
-                     'EVFRESC1': 'ISNRPS_OTHER',
-                     'EVALPERM___0': "EV_LM",
-                     'EVALPERM___1': "EV_IF",
-                     'EVALPERM___2': "EV_EM",
-                     'EVALPERM___4': "EV_ND",
-                     'LNFREASO01': 'EV_RND',
-                     'LMFREAS0': "COMPLM_RND",
-                     "IFFREAS1": "COMPIF_RND",
-                     "EMFREAS0": 'COMPEM_RND',
-                     'PATHNAME': 'MIEVAL',
-                     'DTREC': 'MCFTD',
-                     'RQCOVID': "MIREFID",
 
-                     }))
         # Drop data from data frame that is not completed
-        # Drop null completed data rows
-
-        study_df = study_df.dropna(subset=['requisition_complete', 'lupus_nephritis_complete'])
         columns = ['requisition_complete', 'lupus_nephritis_complete']
-        study_df[columns] = study_df[columns].astype(int)
+
+        # Drop incomplete data rows
+        index_empty_space = study_df[
+            (study_df['lupus_nephritis_complete'] == '') | (study_df['requisition_complete'] == '')].index
+        study_df.drop(index_empty_space, inplace=True)
+        study_df.reset_index(drop=True, inplace=True)
+
+        # Copy dataframe to prevent slicing
         study_df = study_df.copy()
+
+        # Convert string to int
+        study_df[columns] = study_df[columns].astype('Int64')
+
+        # Drop incomplete data rows
         index_not_complete = study_df[
             (study_df['lupus_nephritis_complete'] < 2) | (study_df['requisition_complete'] < 2) | (
                     study_df['lupus_nephritis_complete'] == '')
@@ -105,9 +92,37 @@ def format_df(sponsor_data, study_df):
         study_df.drop(index_not_complete, inplace=True)
         study_df.reset_index(drop=True, inplace=True)
 
+        # Rename columns
+        study_df = (study_df.rename(columns=
+                                    {'RQPATNUM': 'PATNUM',
+                                     'Event Name': 'VISIT',
+                                     'RQREQNO': 'ACCSNM',
+                                     'RQLBSPEC': 'MISPEC',
+                                     'RQLBDAT': 'MCFD',
+                                     'EVFREAS01': 'LBLOC_RND',
+                                     'EVFRESC2': 'LBLOC_OTHER',
+                                     'EVFRESC1': 'ISNRPS_OTHER',
+                                     'EVALPERM___0': 'EV_LM',
+                                     'EVALPERM___1': 'EV_IF',
+                                     'EVALPERM___2': 'EV_EM',
+                                     'EVALPERM___4': 'EV_ND',
+                                     'LNFREASO01': 'EV_RND',
+                                     'LMFREAS0': 'COMPLM_RND',
+                                     'IFFREAS1': 'COMPIF_RND',
+                                     'EMFREAS0': 'COMPEM_RND',
+                                     'PATHNAME': 'MIEVAL',
+                                     'DTREC': 'MCFTD',
+                                     'RQCOVID': 'MIREFID',
+                                     'RENAL': 'LBLOC',
+
+                                     }))
+
         # Add sponsor study data to df
         study_df["STUDYID"] = "YA42816"
         study_df["MINAM"] = "ARKA"
+
+        # Fill in missing values with empty string
+        study_df = study_df.fillna('')
 
         return study_df
 
@@ -154,7 +169,6 @@ def format_df(sponsor_data, study_df):
         study_df.reset_index(drop=True, inplace=True)
         study_df = study_df.drop(columns, axis=1)
 
-
         # Add new fields to study_df
         study_df["STUDYID"] = "WA41937"
         study_df["MINAM"] = "ARKA"
@@ -162,7 +176,6 @@ def format_df(sponsor_data, study_df):
 
         study_df = study_df.fillna('')
         return study_df
-    #testing github
 
 
 def concat_renal(sponsor_data, study_df):
@@ -349,9 +362,10 @@ def create_sdtm(sponsor_data, study_df):
 
     elif sponsor_data[0] == 'Roche Majesty':
         # Create sdtm dataframe
-        columns =  ["STUDYID", 'Subject',  "MINAM", "PATNUM",  "EV_LM", "EV_IF", "EV_EM", 'EV_ND', 'EV_RND', 'COMPLM',
-              'COMPLM_RND','COMPIF', 'COMPIF_RND', 'COMPEM',  'COMPEM_RND', 'LBLOC', 'LBLOC_RND','VISIT_R','MCFD',
-                'MCFTD', "ACCSNM","MIREFID", 'MIEVAL']
+        columns = ["STUDYID", 'Subject', "MINAM", "PATNUM", "EV_LM", "EV_IF", "EV_EM", 'EV_ND', 'EV_RND', 'COMPLM',
+                   'COMPLM_RND', 'COMPIF', 'COMPIF_RND', 'COMPEM', 'COMPEM_RND', 'LBLOC', 'LBLOC_RND', 'VISIT_R',
+                   'MCFD',
+                   'MCFTD', "ACCSNM", "MIREFID", 'MIEVAL']
 
         sdtm = study_df[columns].copy()
 
@@ -707,6 +721,11 @@ def apply_filters(sponsor_data, sdtm_df):
         seq_em = sdtm_df["Row Number"].between(50, 53)
         seq_all = sdtm_df["Row Number"].between(1, 53)
 
+        # Populate MISTAT if an evaluation section is selected Not done
+        sdtm_df.loc[seq_lm & ev_lm_nd, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[seq_if & ev_if_nd, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[seq_em & ev_em_nd, 'MISTAT'] = 'NOT DONE'
+
         # Populate MIREASND for completed on the basis of RND
         sdtm_df.loc[lm_nd & seq_lm, col_not_done] = sdtm_df["COMPLM_RND"]
         sdtm_df.loc[lm_nd & seq_lm, 'MISTAT'] = 'NOT DONE'
@@ -729,13 +748,13 @@ def apply_filters(sponsor_data, sdtm_df):
         sdtm_df.loc[ev_lm_nd & ev_if_nd & ev_em_nd, 'LBORRES'] = ''
         sdtm_df.loc[ev_lm_nd & ev_if_nd & ev_em_nd, 'MCFRESN'] = ''
 
-        # Popualte MIREASND for No renal tissue
+        # Populate MIREASND for No renal tissue
         sdtm_df.loc[renal_nd, col_not_done] = sdtm_df["LBLOC_RND"]
         sdtm_df.loc[renal_nd, 'MISTAT'] = 'NOT DONE'
         sdtm_df.loc[renal_nd, 'LBORRES'] = ''
         sdtm_df.loc[renal_nd, 'MCFRESN'] = ''
 
-        # Popuplate ISNRPS - Not done with default value due to form not having a Reason not done field
+        # Populate ISNRPS - Not done with default value due to form not having a Reason not done field
         isnrps_test = sdtm_df["LBTESTCD"] == "ISNRPS"
         nd = sdtm_df['LBORRES'] == 'Not done'
         ev_lm = sdtm_df['EV_LM'] == 1
@@ -763,6 +782,12 @@ def apply_filters(sponsor_data, sdtm_df):
         # Concatenate LBCOMM Other and LBLOC
         sdtm_df['LBCOMM'] = sdtm_df['LBCOMM'] + '|' + sdtm_df['LBLOC']
         sdtm_df.fillna("", inplace=True)
+
+        # NA Values populate MISTAT and BLANK LBORRES
+        na = sdtm_df['LBORRES'] == 'NA'
+
+        sdtm_df.loc[na, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[na, 'LBORRES'] = ''
         return sdtm_df
 
     elif sponsor_data[0] == 'Roche Majesty':
@@ -863,7 +888,7 @@ def apply_filters(sponsor_data, sdtm_df):
         sdtm_df.loc[nd | not_done | NOT_DONE | Not_Done, "MISTAT"] = 'ND'
         sdtm_df.loc[nd | not_done | NOT_DONE | Not_Done, cols_to_fill] = ''
 
-       #Set default value for Tubular basement membrane becuase form branching is not working properly.
+        # Set default value for Tubular basement membrane becuase form branching is not working properly.
         em_tbm_test = sdtm_df["LBTESTCD"] == "TUBBASMEM"
         nd = sdtm_df['LBORRES'] == 'Not done'
         sdtm_df.loc[em_tbm_test & nd, 'MIREASND'] = 'Not completed'
@@ -875,7 +900,7 @@ def apply_filters(sponsor_data, sdtm_df):
         # Blank LBORRES and MCFRESN where there is a number in MCFRESN
         cols_to_fill = ['LBORRES']
         sdtm_df.loc[blank_num, cols_to_fill] = ''
-        #sdtm_df.loc[emptpy_num, "MCFRESN"]=''
+        # sdtm_df.loc[emptpy_num, "MCFRESN"]=''
         sdtm_df.fillna("", inplace=True)
 
         return sdtm_df
