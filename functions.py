@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import datetime
-import numpy as np
-import warnings
-import pyautogui
+
 
 st.cache(suppress_st_warning=True, persist=False)
 

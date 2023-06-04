@@ -1,5 +1,5 @@
 import streamlit as st
-from PIL import Image
+
 
 top_image = 'images/ARKANA_LOGO.png'
 st.image(top_image, width=75)
