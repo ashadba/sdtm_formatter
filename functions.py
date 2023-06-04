@@ -58,7 +58,7 @@ def read_file(sponsor_data, data_file):
                          'TONUMSCP': str,
                          }
 
-            df = pd.read_csv('Roche_Majesty-_WA41937_2023-05-16.csv',
+            df = pd.read_csv(data_file,
                              dtype=dtype_dic,
                              na_filter=False,
                              # keep_default_na=True,
