@@ -1,9 +1,15 @@
 import streamlit as st
 import pandas as pd
+import datetime
 import numpy as np
 import warnings
+import pyautogui
 
 
+# from streamlit_app import sponsor_data
+
+
+# st.cache(suppress_st_warning=True, persist=False)
 def display_df(df):
     # Added astype(str) to resolve df display error when running streamlit
     df = df.astype(str)
@@ -692,6 +698,7 @@ def add_columns(sponsor_data, sdtm_df):
         sdtm_df['MCFRESN'] = ''
         return sdtm_df
 
+
 # Apply filters to sdtm_df to format data per the DBSPEC specification
 def apply_filters(sponsor_data, sdtm_df):
     if sponsor_data[0] == 'Roche Remley':
@@ -810,25 +817,17 @@ def apply_filters(sponsor_data, sdtm_df):
         return sdtm_df
 
     elif sponsor_data[0] == 'Roche Majesty':
-        # Crate masks for filtering data
+        # Populate Not done for LBORRES and MISTAT
         nd = sdtm_df['LBORRES'] == 'Not done'
         ND = sdtm_df['LBORRES'] == 'ND'
-        na = sdtm_df['MIREASND'] == "Not applicable"
-        em_tbm_test = sdtm_df["LBTESTCD"] == "TUBBASMEM"
         mistat_nd = sdtm_df['MISTAT'] == 'ND'
-        # test filters and results filters
-        antother = sdtm_df["LBTESTCD"] == "ANTOTHER"
-        other_test = sdtm_df["LBTESTCD"] == "OTHER"
-        lborres_nd = sdtm_df["LBORRES"] == "ND"
-        lborres_empty = sdtm_df['LBORRES'] == 'Not done'
+        sdtm_df.loc[nd, 'MISTAT'] = 'ND'
+        sdtm_df.loc[nd, 'MISTAT'] = 'ND'
 
-        blank_num = sdtm_df["MCFRESN"] != ''
-
+        # Apply filters
         cols_to_fill = ["LBORRES"]
         col_not_done = ["MIREASND"]
         filter_list = ['TONUMSEG', 'GL_PREIS', 'TONUMSCP', ]
-        cols_to_fill_num = ["MCFRESN"]
-
         ev_lm = sdtm_df["EV_LM"] != 0
         ev_if = sdtm_df["EV_IF"] != 0
         ev_em = sdtm_df["EV_EM"] != 0
@@ -836,15 +835,14 @@ def apply_filters(sponsor_data, sdtm_df):
         ev_lm_nd = sdtm_df["EV_LM"] == 0
         ev_if_nd = sdtm_df["EV_IF"] == 0
         ev_em_nd = sdtm_df["EV_EM"] == 0
-        ev_em_comp = sdtm_df['EV_EM'] == 1
-        compem_not_nd = sdtm_df['COMPEM_RND'].str.len() == 0
+
         lm_nd = sdtm_df["COMPLM"] == 'Not done'
         if_nd = sdtm_df["COMPIF"] == 'Not done'
         em_nd = sdtm_df["COMPEM"] == 'Not Done'
         renal_nd = sdtm_df["LBORRES"] == "No renal tissue"
 
-
-
+        # if_tests = sdtm_df["LBTESTCD"].str.endswith('_I')
+        sdtm_df['Row Number'] = sdtm_df['Row Number'].astype('Int64')
         seq_ev = sdtm_df["Row Number"].between(1, 23)
         seq_lm = sdtm_df["Row Number"].between(5, 23)
         seq_if = sdtm_df["Row Number"].between(24, 51)
@@ -852,14 +850,14 @@ def apply_filters(sponsor_data, sdtm_df):
         seq_exam = sdtm_df["Row Number"].between(57, 60)
         seq_all = sdtm_df["Row Number"].between(1, 60)
 
-        # Convert Row number to int for filtering
-        sdtm_df['Row Number'] = sdtm_df['Row Number'].astype('Int64')
-
         # Populate MIREASND
+
         sdtm_df.loc[lm_nd & seq_ev, col_not_done] = sdtm_df["COMPLM_RND"]
         sdtm_df.loc[if_nd & seq_if, col_not_done] = sdtm_df["COMPIF_RND"]
         sdtm_df.loc[em_nd & seq_em, col_not_done] = sdtm_df["COMPEM_RND"]
         sdtm_df.loc[renal_nd, col_not_done] = sdtm_df["LBLOC_RND"]
+
+        # populate MIREASND
         sdtm_df.loc[ev_lm_nd & ev_if_nd & ev_em_nd & seq_all, "MIREASND"] = sdtm_df["EV_RND"]
         sdtm_df.loc[ev_lm_nd & ev_if_nd & ev_em_nd & seq_all, "MISTAT"] = 'ND'
         sdtm_df.loc[ev_lm_nd & ev_if_nd & ev_em_nd & seq_all, "LBORRES"] = ''
@@ -867,21 +865,36 @@ def apply_filters(sponsor_data, sdtm_df):
         sdtm_df.loc[lm_nd & seq_lm, "MIREASND"] = sdtm_df["COMPLM_RND"]
         sdtm_df.loc[if_nd & seq_if, "MIREASND"] = sdtm_df["COMPIF_RND"]
         sdtm_df.loc[em_nd & seq_em, "MIREASND"] = sdtm_df["COMPEM_RND"]
-        sdtm_df.loc[antother & lborres_empty, "MIREASND"] = "Not applicable"
-        sdtm_df.loc[other_test & lborres_empty, "MIREASND"] = "Not applicable"
+
+        # Set default value for Tubular basement membranes because the form is not programmed to branch properly
+        em_tbm_test = sdtm_df["LBTESTCD"] == "TUBBASMEM"
+        nd = sdtm_df['LBORRES'] == 'Not done'
+
         sdtm_df.loc[em_tbm_test & nd, 'MIREASND'] = 'Not completed'
-        sdtm_df.loc[em_tbm_test & nd & ev_em_comp & compem_not_nd, 'MISTAT'] = 'ND'
+        ev_em = sdtm_df['EV_EM'] == 1
+        compem_not_nd = sdtm_df['COMPEM_RND'].str.len() == 0
+
+        sdtm_df.loc[em_tbm_test & nd & ev_em & compem_not_nd, 'MISTAT'] = 'ND'
         sdtm_df.loc[em_tbm_test & nd, 'LBORRES'] = ''
 
-        # Set MISTAT
-        sdtm_df.loc[na, "MISTAT"] = "ND"
-        sdtm_df.loc[nd, 'MISTAT'] = 'ND'
-        sdtm_df.loc[nd, 'MISTAT'] = 'ND'
+        filter_list = ['TONUMSEG', 'GL_PREIS', 'TONUMSCP', ]
+        cols_to_fill = ["MCFRESN"]
 
-        # Populate MISTAT if an evaluation section is selected Not done
-        sdtm_df.loc[seq_lm & ev_lm_nd, 'MISTAT'] = 'NOT DONE'
-        sdtm_df.loc[seq_if & ev_if_nd, 'MISTAT'] = 'NOT DONE'
-        sdtm_df.loc[seq_em & ev_em_nd, 'MISTAT'] = 'NOT DONE'
+        antother = sdtm_df["LBTESTCD"] == "ANTOTHER"
+        other_test = sdtm_df["LBTESTCD"] == "OTHER"
+        lborres_nd = sdtm_df["LBORRES"] == "ND"
+        lborres_empty = sdtm_df['LBORRES'] == 'Not done'
+        na = sdtm_df['MIREASND'] == "Not applicable"
+        blank_num = sdtm_df["MCFRESN"] != ''
+        na_value = sdtm_df['LBORRES'] == 'NA'
+        # Populate empty OTHER columns Reason Not done
+        sdtm_df.loc[antother & lborres_empty, "MIREASND"] = "Not applicable"
+        sdtm_df.loc[other_test & lborres_empty, "MIREASND"] = "Not applicable"
+        sdtm_df.loc[other_test & na_value, "MIREASND"] = "Not applicable"
+        sdtm_df.loc[antother & na_value, "MIREASND"] = "Not applicable"
+
+        # Set MISTAT for LBTEST = antother and other
+        sdtm_df.loc[na, "MISTAT"] = "ND"
 
         # populate MCFRESN where LBORRES = 0
         zero = sdtm_df['LBORRES'] == 0
@@ -897,46 +910,34 @@ def apply_filters(sponsor_data, sdtm_df):
         sdtm_df.loc[zero, 'LBORRES'] = ''
         sdtm_df.loc[ZERO, 'LBORRES'] = ''
 
-        sdtm_df.fillna("", inplace=True)
-
         # Populate MISTAT with ND and Blank LBORRES and MCFRESN where values = Not done or ND
         # Columns to blank
+        cols_to_fill = ["LBORRES", "MCFRESN"]
         nd = sdtm_df['LBORRES'] == 'ND'
+        na = sdtm_df['LBORRES'] == 'NA'
         not_done = sdtm_df['LBORRES'] == 'Not done'
         NOT_DONE = sdtm_df['LBORRES'] == 'NOT DONE'
         Not_Done = sdtm_df['LBORRES'] == 'Not Done'
         blank_num = sdtm_df["MCFRESN"].str.len() > 0
-        emptpy_num = sdtm_df["LBORRES"].str.len() > 0
 
-        # Apply ND to MISTAT and blank results columns
-        cols_to_fill = ["LBORRES", "MCFRESN", 'LBCOMM']
+        sdtm_df.loc[nd, 'MISTAT'] = 'ND'
+        sdtm_df.loc[na, 'MISTAT'] = 'ND'
+        sdtm_df.loc[not_done, 'MISTAT'] = 'ND'
+        sdtm_df.loc[Not_Done, 'MISTAT'] = 'ND'
 
-        sdtm_df.loc[nd | not_done | NOT_DONE | Not_Done, "MISTAT"] = 'ND'
-        sdtm_df.loc[nd | not_done | NOT_DONE | Not_Done, cols_to_fill] = ''
+        sdtm_df.loc[nd, 'MCFRESN'] = ''
+        sdtm_df.loc[na, 'MCFRESN'] = ''
+        sdtm_df.loc[not_done, 'MCFRESN'] = ''
+        sdtm_df.loc[Not_Done, 'MCFRESN'] = ''
 
-        # Set default value for Tubular basement membrane becuase form branching is not working properly.
-        em_tbm_test = sdtm_df["LBTESTCD"] == "TUBBASMEM"
-        nd = sdtm_df['LBORRES'] == 'Not done'
-        sdtm_df.loc[em_tbm_test & nd, 'MIREASND'] = 'Not completed'
-        ev_em = sdtm_df['EV_EM'] == 1
-        compem_not_nd = sdtm_df['COMPEM_RND'].str.len() == 0
-        sdtm_df.loc[em_tbm_test & nd & ev_em & compem_not_nd, 'MISTAT'] = 'ND'
-        sdtm_df.loc[em_tbm_test & nd, 'LBORRES'] = ''
-
-        # Blank LBORRES and MCFRESN where there is a number in MCFRESN
-        cols_to_fill = ['LBORRES']
-        sdtm_df.loc[blank_num, cols_to_fill] = ''
-        # sdtm_df.loc[emptpy_num, "MCFRESN"]=''
-
-        # NA Values populate MISTAT and BLANK LBORRES
-        na = sdtm_df['LBORRES'] == 'NA'
-
-        sdtm_df.loc[na, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[nd, 'LBORRES'] = ''
         sdtm_df.loc[na, 'LBORRES'] = ''
+        sdtm_df.loc[not_done, 'LBORRES'] = ''
+        sdtm_df.loc[Not_Done, 'LBORRES'] = ''
 
-        # Fill NA values with blanks
+        # Blank LBORRES where there is a number in MCFRESN
+        sdtm_df.loc[blank_num, 'LBORRES'] = ''
         sdtm_df.fillna("", inplace=True)
-
         return sdtm_df
 
 
@@ -1031,38 +1032,52 @@ def convert_df(df):
     return df.to_csv().encode('utf-8')
 
 
-def download_sdtm(sponsor_data, sdtm_df):
+def get_file_name(sponsor_data):
+    from datetime import datetime
+    current_date = datetime.today().strftime('%Y%m%d%H%M%S').upper()
+
+    if sponsor_data[0] == 'Roche Remley':
+        file_name = "YA42816_ARKA_MCF1_PROD_V3.0_" + current_date + '.csv'
+        return file_name
+
+    elif sponsor_data[0] == 'Roche Majesty':
+        file_name = "WA41937_ARKA_MCF1_PROD_V5.0_" + current_date + '.csv'
+        return file_name
+
+
+def print_download_message(file_name):
+    st.write(f"Please check your downloads folder for {file_name}")
+    return
+
+
+def download_sdtm(sponsor_data, sdtm_df, file_name):
     import datetime
     timestamp = pd.Timestamp(datetime.datetime(2021, 10, 10))
     current_date = timestamp.now()
 
     if sponsor_data[0] == 'Roche Remley':
-        # Sponsor file naming convention for current FFS
-        # YA42816_ARKA_MCF1_PROD_V3.0_YYYYMMDDHHMMSS.csv - {Production file}
-        # YA42816_ARKA_MCF1_TEST_V3.0_YYYYMMDDHHMMSS.csv - {Test file}
-
-        current_date = current_date.strftime('%Y%m%d%H%M%S').upper()
-        file_name = "YA42816_ARKA_MCF1_PROD_V3.0_" + current_date + '.csv'
         csv = sdtm_df.to_csv(index=False).encode("utf-8")
 
     elif sponsor_data[0] == 'Roche Majesty':
-        # Sponsor file naming convention for current FFS
-        # WA41937_ARKA_MCF1_PROD_V4.0_YYYYMMDDHHMMSS.csv
-        # WA41937_ARKA_MCF1_TEST_V4.0_YYYYMMDDHHMMSS.csv
-
-        current_date = current_date.strftime('%Y%m%d%H%M%S').upper()
-        file_name = "WA41937_ARKA_MCF1_PROD_V5.0_" + current_date + '.csv'
         csv = sdtm_df.to_csv(index=False, encoding='utf-8')
 
     if len(csv) != 0:
-        if st.download_button(
-                label='Download SDTM file',
-                data=csv,
-                file_name=file_name,
-                mime='text/csv',
-                key="sdtm-csv", ):
-            st.write(f"Check your downloads folder for {file_name}")
+        if 'downloaded' not in st.session_state:
+            st.session_state.downloaded = 0
+
+        def increment_counter():
+            st.session_state.downloaded += 1
+
+        st.download_button(label='Click to download SDTM file',
+                           data=csv,
+                           file_name=file_name,
+                           mime='text/csv',
+                           key="sdtm-csv",
+                           on_click=increment_counter)
+
+        if st.session_state.downloaded > 0:
+            print_download_message(file_name)
         return
     else:
-        st.write("File is empty.  Email:  helpdesk@arkanalabs.com")
+        st.write(f"No SDTM data available.")
         return
