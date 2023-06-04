@@ -38,16 +38,15 @@ def read_file(sponsor_data, data_file):
                          'TONUMSCP': str,
                          'IND_TOSC': str,
                          'CHROINTS': str,
+                         'RQPATNUM:': str,
+                         'RQCOVID:': str,
+                         'RQREQNO': str,
                          }
 
             df = pd.read_csv(data_file,
-                             converters={'RQPATNUM:': str,
-                                         'RQCOVID:': str,
-                                         'RQREQNO': str,
-
-                                         },
                              dtype=dtype_dic,
-                             na_filter=False, keep_default_na=True,
+                             na_filter=False,
+                             #keep_default_na=True,
                              parse_dates=["RQLBDAT", 'DTREC', ])
 
             return df
