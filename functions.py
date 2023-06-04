@@ -5,11 +5,9 @@ import numpy as np
 import warnings
 import pyautogui
 
+st.cache(suppress_st_warning=True, persist=False)
 
-# from streamlit_app import sponsor_data
 
-
-# st.cache(suppress_st_warning=True, persist=False)
 def display_df(df):
     # Added astype(str) to resolve df display error when running streamlit
     df = df.astype(str)
