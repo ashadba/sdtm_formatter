@@ -20,7 +20,7 @@ with st.sidebar:
 
 if section == 'SDTM Data Mapper':
     sponsor_data = fun.get_sponsor()
-    uploaded_file = st.file_uploader("Upload exported data file.")
+    uploaded_file = st.file_uploader("Upload exported data file")
 
     if uploaded_file is not None:
         data_df = fun.read_file(sponsor_data, uploaded_file)

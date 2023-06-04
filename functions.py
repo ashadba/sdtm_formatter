@@ -46,21 +46,22 @@ def read_file(sponsor_data, data_file):
             df = pd.read_csv(data_file,
                              dtype=dtype_dic,
                              na_filter=False,
-                             #keep_default_na=True,
+                             # keep_default_na=True,
                              parse_dates=["RQLBDAT", 'DTREC', ])
 
             return df
         elif sponsor_data[0] == 'Roche Majesty':
-            df = pd.read_csv(data_file,
-                             converters={'Subject': str,
-                                         'RQPATNUM:': str,
-                                         'RQCOVID:': str,
-                                         'TONUMSEG': str,
-                                         'GL_PREIS': str,
-                                         'TONUMSCP': str,
+            dtype_dic = {'RQPATNUM:': str,
+                         'RQCOVID:': str,
+                         'TONUMSEG': str,
+                         'GL_PREIS': str,
+                         'TONUMSCP': str,
+                         }
 
-                                         },
-
+            df = pd.read_csv('Roche_Majesty-_WA41937_2023-05-16.csv',
+                             dtype=dtype_dic,
+                             na_filter=False,
+                             # keep_default_na=True,
                              parse_dates=["RQLBDAT", 'DTREC', ])
             return df
 
@@ -151,15 +152,22 @@ def format_df(sponsor_data, study_df):
                      }))
 
         # Delete data that is not ready to send to sponsor
-        # delete null completed data rows
-        study_df = study_df.dropna(subset=['requisition_complete', 'membranous_nephropathy_complete'])
+        # Delete data rows that have empty space in them
+        index_empty_space = study_df[
+            (study_df['membranous_nephropathy_complete'] == '') | (study_df['requisition_complete'] == '')].index
+        study_df.drop(index_empty_space, inplace=True)
+        study_df.reset_index(drop=True, inplace=True)
 
         columns = ['membranous_nephropathy_complete', 'requisition_complete']
+
+        # Copy dataframe to prevent slicing
         study_df = study_df.copy()
+
+        # Convert form completed values to int64
         study_df["requisition_complete"] = study_df["requisition_complete"].astype('Int64')
         study_df["membranous_nephropathy_complete"] = study_df["membranous_nephropathy_complete"].astype('Int64')
 
-        study_df = study_df.copy()
+        # Delete incomplete data rows
         index_not_complete = study_df[
             (study_df['membranous_nephropathy_complete'] < 2) | (study_df['requisition_complete'] < 2) | (
                     study_df['membranous_nephropathy_complete'] == '')
@@ -173,6 +181,7 @@ def format_df(sponsor_data, study_df):
         study_df["MINAM"] = "ARKA"
         study_df['ACCSNM'] = study_df['MIREFID']
 
+        # Fill in missing values with empty string
         study_df = study_df.fillna('')
         return study_df
 
@@ -185,10 +194,13 @@ def concat_renal(sponsor_data, study_df):
         study_df['LBLOC'] = study_df['LBLOC'].replace('Other', '')
         study_df['LBLOC'] = study_df['LBLOC'] + study_df['LBLOC_OTHER']
         return study_df
+
     if sponsor_data[0] == 'Roche Majesty':
+        # This function is not used in Majesty
         return study_df
 
 
+# Visit function to convert study visits to sponsor visits
 def get_visit_num(visit):
     if visit == "screening":
         return "SCRN"
@@ -218,12 +230,14 @@ def get_visit_num(visit):
         return "Error"
 
 
+# Apply sponsor visits to study_df
 def apply_visit(sponsor_data, study_df):
     study_df = study_df.copy()
     study_df["VISIT_R"] = study_df["VISIT"].apply(get_visit_num)
     return study_df
 
 
+# Apply Not done reasons to all fields that match not done criteria
 def format_rnd(sponsor_data, study_df):
     if sponsor_data[0] == 'Roche Remley':
         # Req eval apply Reason not done
@@ -342,6 +356,7 @@ def format_rnd(sponsor_data, study_df):
         return study_df
 
 
+# Create sdtm dataframe
 def create_sdtm(sponsor_data, study_df):
     if sponsor_data[0] == 'Roche Remley':
         # Create sdtm dataframe
@@ -376,6 +391,7 @@ def create_sdtm(sponsor_data, study_df):
         return sdtm
 
 
+# Create dbspec dataframe
 def create_dbspec(sponsor_data):
     import warnings
     if sponsor_data[0] == 'Roche Remley':
@@ -392,6 +408,8 @@ def create_dbspec(sponsor_data):
         return dbspec
 
 
+# Create the result, other, and reason_not_done columns by melting values into columns for result, other, and reason
+# not done
 def melt_columns(sponsor_data, study_df, dbspec_df, sdtm_df):
     if sponsor_data[0] == 'Roche Remley':
 
@@ -662,17 +680,19 @@ def melt_columns(sponsor_data, study_df, dbspec_df, sdtm_df):
         return sdtm_df
 
 
+# Add sponsor-specific columns to sdtm_df
 def add_columns(sponsor_data, sdtm_df):
     if sponsor_data[0] == 'Roche Remley':
         sdtm_df['MISTAT'] = ''
         sdtm_df['MCFRESN'] = ''
         return sdtm_df
+
     elif sponsor_data[0] == 'Roche Majesty':
         sdtm_df['MISTAT'] = ''
         sdtm_df['MCFRESN'] = ''
         return sdtm_df
 
-
+# Apply filters to sdtm_df to format data per the DBSPEC specification
 def apply_filters(sponsor_data, sdtm_df):
     if sponsor_data[0] == 'Roche Remley':
         filter_list = ['TONUMSEG', 'GL_PREIS', 'TONUMSCP', 'CHROINTS', 'IND_TOSC']
@@ -790,6 +810,7 @@ def apply_filters(sponsor_data, sdtm_df):
         return sdtm_df
 
     elif sponsor_data[0] == 'Roche Majesty':
+        # Crate masks for filtering data
         nd = sdtm_df['LBORRES'] == 'Not done'
         ND = sdtm_df['LBORRES'] == 'ND'
         na = sdtm_df['MIREASND'] == "Not applicable"
@@ -803,7 +824,6 @@ def apply_filters(sponsor_data, sdtm_df):
 
         blank_num = sdtm_df["MCFRESN"] != ''
 
-        # apply values to LBORRES and MIREASND for COMP_LM, COMP_IF, and COMP_EM
         cols_to_fill = ["LBORRES"]
         col_not_done = ["MIREASND"]
         filter_list = ['TONUMSEG', 'GL_PREIS', 'TONUMSCP', ]
@@ -823,8 +843,7 @@ def apply_filters(sponsor_data, sdtm_df):
         em_nd = sdtm_df["COMPEM"] == 'Not Done'
         renal_nd = sdtm_df["LBORRES"] == "No renal tissue"
 
-        # convert Row number to int for filtering
-        sdtm_df['Row Number'] = sdtm_df['Row Number'].astype('Int64')
+
 
         seq_ev = sdtm_df["Row Number"].between(1, 23)
         seq_lm = sdtm_df["Row Number"].between(5, 23)
@@ -832,6 +851,9 @@ def apply_filters(sponsor_data, sdtm_df):
         seq_em = sdtm_df["Row Number"].between(52, 56)
         seq_exam = sdtm_df["Row Number"].between(57, 60)
         seq_all = sdtm_df["Row Number"].between(1, 60)
+
+        # Convert Row number to int for filtering
+        sdtm_df['Row Number'] = sdtm_df['Row Number'].astype('Int64')
 
         # Populate MIREASND
         sdtm_df.loc[lm_nd & seq_ev, col_not_done] = sdtm_df["COMPLM_RND"]
@@ -855,6 +877,11 @@ def apply_filters(sponsor_data, sdtm_df):
         sdtm_df.loc[na, "MISTAT"] = "ND"
         sdtm_df.loc[nd, 'MISTAT'] = 'ND'
         sdtm_df.loc[nd, 'MISTAT'] = 'ND'
+
+        # Populate MISTAT if an evaluation section is selected Not done
+        sdtm_df.loc[seq_lm & ev_lm_nd, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[seq_if & ev_if_nd, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[seq_em & ev_em_nd, 'MISTAT'] = 'NOT DONE'
 
         # populate MCFRESN where LBORRES = 0
         zero = sdtm_df['LBORRES'] == 0
@@ -900,6 +927,14 @@ def apply_filters(sponsor_data, sdtm_df):
         cols_to_fill = ['LBORRES']
         sdtm_df.loc[blank_num, cols_to_fill] = ''
         # sdtm_df.loc[emptpy_num, "MCFRESN"]=''
+
+        # NA Values populate MISTAT and BLANK LBORRES
+        na = sdtm_df['LBORRES'] == 'NA'
+
+        sdtm_df.loc[na, 'MISTAT'] = 'NOT DONE'
+        sdtm_df.loc[na, 'LBORRES'] = ''
+
+        # Fill NA values with blanks
         sdtm_df.fillna("", inplace=True)
 
         return sdtm_df
