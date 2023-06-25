@@ -1,2 +1,5 @@
+[browser]
+wideMode=true
+
 [theme]
 base="dark"
