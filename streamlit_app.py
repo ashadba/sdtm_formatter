@@ -6,7 +6,6 @@ import functions as fun
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-
 pd.set_option('display.max_columns', None)
 
 st.title('Arkana Labs - SDTM Data Formatter')
