@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 
-
 st.cache(suppress_st_warning=True, persist=False)
 
 
@@ -982,13 +981,12 @@ def prepare_for_export(sponsor_data, sdtm_df):
 
     elif sponsor_data[0] == 'Roche Majesty':
         # drop columns not needed
-        cols_to_drop = ['MCFD']
-        sdtm_df.drop(columns=cols_to_drop, axis=1, inplace=True)
+
         sdtm_df['MCFRESC'] = sdtm_df['LBORRES']
 
         # #add  missing sdtm_df columns as blank columns
         columns_to_add = ['MISPCCND', 'MCFTPT', 'MCFTM', 'MIMTDTL', 'MITSTDTL', 'MIOBJSCI', 'MIMRKSTR', 'MIOBJSCR',
-                          'MCFD', "MISPEC"]
+                          "MISPEC"]
 
         for column in columns_to_add:
             sdtm_df[column] = ""
@@ -1014,6 +1012,10 @@ def prepare_for_export(sponsor_data, sdtm_df):
         sdtm_df['MCFTD'] = pd.to_datetime(sdtm_df.MCFTD, format='%Y%m%d')
         sdtm_df['MCFTD'] = sdtm_df['MCFTD'].dt.strftime('%Y%m%d')
 
+        sdtm_df["MCFD"] = pd.to_datetime(sdtm_df.MCFD, format='%Y-%m-%d')
+        sdtm_df['MCFD'] = pd.to_datetime(sdtm_df.MCFD, format='%Y%m%d')
+        sdtm_df['MCFD'] = sdtm_df['MCFD'].dt.strftime('%Y%m%d')
+
         # Convert sdtm_df to UPPERCASE
         sdtm_df = sdtm_df.apply(lambda x: x.astype(str).str.upper())
 
@@ -1027,6 +1029,11 @@ def convert_df(df):
     return df.to_csv().encode('utf-8')
 
 
+def print_download_message(file_name):
+    st.write(f"Please check your downloads folder for {file_name}")
+    return
+
+
 def get_file_name(sponsor_data):
     from datetime import datetime
     current_date = datetime.today().strftime('%Y%m%d%H%M%S').upper()
@@ -1036,13 +1043,8 @@ def get_file_name(sponsor_data):
         return file_name
 
     elif sponsor_data[0] == 'Roche Majesty':
-        file_name = "WA41937_ARKA_MCF1_PROD_V5.0_" + current_date + '.csv'
+        file_name = "WA41937_ARKA_MCF1_PROD_V6.0_" + current_date + '.csv'
         return file_name
-
-
-def print_download_message(file_name):
-    st.write(f"Please check your downloads folder for {file_name}")
-    return
 
 
 def download_sdtm(sponsor_data, sdtm_df, file_name):
@@ -1057,22 +1059,14 @@ def download_sdtm(sponsor_data, sdtm_df, file_name):
         csv = sdtm_df.to_csv(index=False, encoding='utf-8')
 
     if len(csv) != 0:
-        if 'downloaded' not in st.session_state:
-            st.session_state.downloaded = 0
-
-        def increment_counter():
-            st.session_state.downloaded += 1
-
-        st.download_button(label='Click to download SDTM file',
+        if st.download_button(label='Click to download SDTM file',
                            data=csv,
                            file_name=file_name,
                            mime='text/csv',
-                           key="sdtm-csv",
-                           on_click=increment_counter)
-
-        if st.session_state.downloaded > 0:
+                           key="sdtm-csv"
+                           ):
             print_download_message(file_name)
-        return
+            return
     else:
         st.write(f"No SDTM data available.")
         return
